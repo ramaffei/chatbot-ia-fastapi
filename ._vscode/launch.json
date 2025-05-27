@@ -1,0 +1,32 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Debug",
+      "type": "debugpy",
+      "request": "attach",
+      "connect": { "host": "localhost", "port": 5678 },
+      "pathMappings": [
+        {
+          "localRoot": "${workspaceFolder}/app",
+          "remoteRoot": "/workdir/app"
+        }
+      ]
+    },
+    {
+      "name": "Test Debug",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/tests",
+      "purpose": ["debug-test"],
+      "console": "integratedTerminal",
+      "pathMappings": [
+        {
+          "localRoot": "${workspaceFolder}/app",
+          "remoteRoot": "/workdir/app"
+        }
+      ],
+      "env": { "PYTEST_ADDOPTS": "--no-cov" }
+    }
+  ]
+}

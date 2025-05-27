@@ -1,0 +1,49 @@
+services:
+  db:
+    image: postgres:16.6
+    environment:
+      POSTGRES_USER: ${DBUser}
+      POSTGRES_PASSWORD: ${DBPassword}
+      POSTGRES_DB: ${DBName}
+    ports:
+      - "5432:5432"
+    volumes:
+      - ./postgres_init:/postgres_init
+      - ./postgres_init/restore.sh:/docker-entrypoint-initdb.d/restore.sh
+      - pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -d ${DBName} -U ${DBUser}"]
+      interval: 5s
+      timeout: 10s
+      retries: 10
+
+  app: &appbase
+    build: .
+    command: uvicorn --app-dir /workdir/app main:app --reload --lifespan on --host 0.0.0.0 --port 8000
+    volumes:
+      - .:/workdir
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DEBUG: True
+      DBHost: db
+
+
+  migrations:
+    <<: *appbase
+    depends_on: {}
+    command: alembic upgrade head
+
+  debug:
+    <<: *appbase
+    command: >
+      bash -c "python -Xfrozen_modules=off -m debugpy --wait-for-client --listen 0.0.0.0:5678 -m uvicorn --app-dir /workdir/app main:app --reload --host 0.0.0.0 --port 8000"
+    ports:
+      - "8000:8000"
+      - "5678:5678"
+
+volumes:
+  pg_data: {}
