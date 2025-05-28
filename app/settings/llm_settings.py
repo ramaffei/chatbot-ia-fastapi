@@ -1,10 +1,10 @@
 import logging
 from typing import Optional
 
+from exceptions.llm import LLMException
+from pydantic import model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from settings.llm_supported_models import SUPPORTED_MODELS
-
-from app.exceptions.llm_factory import LLMException
 
 logger = logging.getLogger(__name__)
 
@@ -24,15 +24,17 @@ class LLMSettings(BaseSettings):
     apiKey: Optional[str] = None
     modelProvider: Optional[str] = None
 
-    def get_provider(self) -> str:
-        if self.modelProvider:
-            return self.modelProvider
-        if self.modelName in SUPPORTED_MODELS:
-            return SUPPORTED_MODELS[self.modelName]
-        logger.error(
-            f"Model '{self.modelName}' not supported. Add it to SUPPORTED_MODELS."
-        )
-        raise LLMException(LLMException.ErrorCode.Model_Not_Found)
+    @model_validator(mode="after")
+    def set_provider(self):
+        if not self.modelProvider:
+            if self.modelName in SUPPORTED_MODELS:
+                self.modelProvider = SUPPORTED_MODELS[self.modelName]
+            else:
+                logger.error(
+                    f"Model '{self.modelName}' not supported. Add it to SUPPORTED_MODELS."
+                )
+                raise LLMException(LLMException.ErrorCode.Model_Not_Found)
+        return self
 
 
 llm_settings = LLMSettings()

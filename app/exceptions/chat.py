@@ -10,3 +10,7 @@ class ChatException(APIError):
             status.HTTP_409_CONFLICT,
         )
         Message_Not_Found = "Message not found", status.HTTP_404_NOT_FOUND
+        Chat_Internal_Error = (
+            "Chat internal error",
+            status.HTTP_500_INTERNAL_SERVER_ERROR,
+        )

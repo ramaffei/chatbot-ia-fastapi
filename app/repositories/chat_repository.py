@@ -8,7 +8,7 @@ class ChatRepository(ModelRepository):
     field_not_found = ChatException(ChatException.ErrorCode.Chat_Not_Found)
     already_exists_error = ChatException(ChatException.ErrorCode.Already_Exist)
 
-    def get_messages_by_chat_id(self, chat_id: str) -> list[Message]:
+    def get_chat_messages_by_id(self, chat_id: str) -> list[Message]:
         chat: Chat = self.get(chat_id)
         if not chat:
             raise self.field_not_found
@@ -23,3 +23,11 @@ class ChatRepository(ModelRepository):
         chat.messages.append(message)
         self.update_instance(chat)
         return message
+
+    def add_chat_messages(self, chat_id: str, messages: list[Message]) -> None:
+        chat: Chat = self.get(chat_id)
+        if not chat:
+            raise self.field_not_found
+
+        chat.messages.extend(messages)
+        self.update_instance(chat)

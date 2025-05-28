@@ -5,6 +5,7 @@ services:
       POSTGRES_USER: ${DBUser}
       POSTGRES_PASSWORD: ${DBPassword}
       POSTGRES_DB: ${DBName}
+      POSTGRES_SCHEMA: ${DBSchema}
     ports:
       - "5432:5432"
     volumes:

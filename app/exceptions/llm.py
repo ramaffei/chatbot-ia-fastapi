@@ -10,3 +10,4 @@ class LLMException(APIError):
             status.HTTP_500_INTERNAL_SERVER_ERROR,
         )
         Import_Error = "Import error", status.HTTP_500_INTERNAL_SERVER_ERROR
+        LLM_Internal_Error = "LLM Internal error", status.HTTP_500_INTERNAL_SERVER_ERROR
