@@ -1,13 +1,12 @@
 import logging
-from typing import Dict, Any
+from typing import Any, Dict
 
 from db.deps import get_session
-from fastapi import APIRouter, Body, Depends, UploadFile, File
+from fastapi import APIRouter, Body, Depends, File, UploadFile
 from fastapi_versioning import version
-from sqlalchemy.orm import Session
-
-from services.chat_service import ChatService
 from schemas.external.message_schema import MessageInput
+from services.chat_service import ChatService
+from sqlalchemy.orm import Session
 
 router = APIRouter()
 logger = logging.getLogger(f"app.{__name__}")
