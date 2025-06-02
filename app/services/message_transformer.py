@@ -20,7 +20,7 @@ class MessageTransformer:
             f" {context} "
             if context
             else ""
-            """ Si no hay contexto, responde de manera general."""
+            """ Si no hay contexto, responde de manera general pero resumida."""
         )
         return SystemMessage(prompt or default_prompt)
 

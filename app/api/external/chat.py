@@ -1,14 +1,12 @@
 import logging
-from typing import Any, Dict
 
 from db.deps import get_session
 from fastapi import APIRouter, Body, Depends, File, UploadFile
 from fastapi_versioning import version
 from schemas.external.message_schema import MessageInput
 from services.chat_service import ChatService
+from services.rag_service import RAGService
 from sqlalchemy.orm import Session
-
-from services.rag_service import VectorStoreService
 
 router = APIRouter()
 logger = logging.getLogger(f"app.{__name__}")
@@ -19,7 +17,7 @@ logger = logging.getLogger(f"app.{__name__}")
 async def message_generate(
     session: Session = Depends(get_session),
     user_message: MessageInput = Body(...),
-) -> Dict[str, Any]:
+) -> dict:
     """
     Generate a response to a chat message.
 
@@ -39,7 +37,7 @@ async def message_generate(
     )
 
     logger.info(f"Generated response: {response}")
-    return {"content": response.content}
+    return {"content": response.content, "chat_id": chat_service.chat_id}
 
 
 @router.post("/chat/upload-pdf")
@@ -61,7 +59,7 @@ async def upload_pdf(
 
     contents = await file.read()
 
-    chat_service = VectorStoreService()
+    chat_service = RAGService()
 
     document_id = chat_service.add_pdf_to_vector_store(contents)
 
