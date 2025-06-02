@@ -2,13 +2,15 @@ import logging
 from typing import Any, Dict, List
 
 from exceptions.chat import ChatException
-from langchain_core.messages import BaseMessage, SystemMessage
+from langchain_core.messages import BaseMessage
 from models.chat_model import Chat, MessageRole
 from providers.llm_provider import LLMProvider
 from repositories.chat_repository import ChatRepository
 from services.document_service import DocumentService
 from services.message_transformer import MessageTransformer
 from sqlalchemy.orm import Session
+
+from services.rag_service import VectorStoreService
 
 logger = logging.getLogger(__name__)
 
@@ -24,6 +26,7 @@ class ChatService:
         self.llm_service = LLMProvider()
         self.transformer = MessageTransformer()
         self.document_service = DocumentService()
+        self.rag_service = VectorStoreService()
         self.username: str | None = username
         self._chat_id = self._ensure_chat_exists(chat_id, username)
 
@@ -43,27 +46,17 @@ class ChatService:
             )
 
             # 2. Buscar contexto relevante en los documentos
-            relevant_context = await self.document_service.query_documents(
-                conversation_id=self._chat_id, query=user_message
+            context_text = self.rag_service.similarity_search_by_query(
+                query=user_message
             )
 
             # 3. Construir historial para LLM
-            history = self._build_history()
+            history = self._build_history(context=context_text)
 
-            # 4. Agregar contexto de documentos si existe
-            if relevant_context:
-                context_text = self._format_context(relevant_context)
-                history.insert(
-                    0,
-                    SystemMessage(
-                        content=f"Context from relevant documents:\n{context_text}\n\nPlease use this context to inform your response when relevant."
-                    ),
-                )
-
-            # 5. Obtener respuesta del LLM
+            # 4. Obtener respuesta del LLM
             ai_response = self.llm_service.get_message_response(history=history)
 
-            # 6. Guardar respuesta de la IA
+            # 5. Guardar respuesta de la IA
             self.repository.create_message(
                 chat_id=self._chat_id,
                 role=MessageRole.AIMessage,
@@ -76,9 +69,9 @@ class ChatService:
             logger.error(f"Error procesando mensaje: {e}")
             raise ChatException(ChatException.ErrorCode.Chat_Internal_Error)
 
-    def _build_history(self) -> list[BaseMessage]:
+    def _build_history(self, context: str | None) -> list[BaseMessage]:
         db_messages = self.repository.get_chat_messages_by_id(self._chat_id)
-        history = [self.transformer.get_system_message()]
+        history = [self.transformer.get_system_message(context=context)]
         history.extend(self.transformer.to_langchain_messages(db_messages))
         return history
 

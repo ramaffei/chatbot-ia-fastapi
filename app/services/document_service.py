@@ -1,106 +1,47 @@
-from typing import List, Dict, Any
-import httpx
-from pypdf import PdfReader
-from io import BytesIO
-import uuid
+import tempfile
+
+from langchain.text_splitter import RecursiveCharacterTextSplitter
+from langchain_community.document_loaders import PyPDFLoader
+from langchain_core.documents import Document
 
 
 class DocumentService:
-    def __init__(self, chroma_url: str):
-        print(f"ChromaDB URL: {chroma_url}")
-        self.chroma_url = f"http://{chroma_url}:8000"
-        self.headers = {
-            "Authorization": "Basic YWRtaW46YWRtaW4=",  # admin:admin in base64
-            "Content-Type": "application/json",
-        }
-
-    async def process_pdf(self, file_content: bytes, conversation_id: str) -> str:
-        """Process a PDF file and store its content in ChromaDB"""
-        # Extract text from PDF
-        pdf_text = self._extract_text_from_pdf(file_content)
-
-        # Generate a unique document ID
-        document_id = str(uuid.uuid4())
-
-        # Create collection if it doesn't exist
-        collection_name = f"conversation_{conversation_id}"
-        await self._create_or_get_collection(collection_name)
-
-        # Add document to ChromaDB
-        await self._add_documents(
-            collection_name=collection_name,
-            documents=[pdf_text],
-            metadatas=[
-                {"document_id": document_id, "conversation_id": conversation_id}
-            ],
-            ids=[document_id],
-        )
-
-        return document_id
-
-    def _extract_text_from_pdf(self, file_content: bytes) -> str:
-        """Extract text content from a PDF file"""
-        pdf = PdfReader(BytesIO(file_content))
-        text = ""
-        for page in pdf.pages:
-            text += page.extract_text() + "\n"
-        return text
-
-    async def _create_or_get_collection(self, name: str) -> None:
-        """Create a new collection in ChromaDB if it doesn't exist"""
-        async with httpx.AsyncClient() as client:
-            try:
-                response = await client.post(
-                    f"{self.chroma_url}/api/v1/collections",
-                    headers=self.headers,
-                    json={"name": name},
-                )
-                response.raise_for_status()
-            except httpx.HTTPStatusError as e:
-                if e.response.status_code != 409:  # 409 means collection already exists
-                    raise
-
-    async def _add_documents(
+    def pdf_to_documents(
         self,
-        collection_name: str,
-        documents: List[str],
-        metadatas: List[Dict[str, Any]],
-        ids: List[str],
-    ) -> None:
-        """Add documents to a ChromaDB collection"""
-        async with httpx.AsyncClient() as client:
-            response = await client.post(
-                f"{self.chroma_url}/api/v1/collections/{collection_name}/add",
-                headers=self.headers,
-                json={"documents": documents, "metadatas": metadatas, "ids": ids},
-            )
-            response.raise_for_status()
+        file_path: str | None = None,
+        file_bytes: bytes | None = None,
+        chunk_size: int = 1000,
+        chunk_overlap: int = 100,
+    ) -> list[Document]:
+        if not file_path and not file_bytes:
+            raise ValueError("Debe proporcionar un archivo PDF o bytes del archivo.")
 
-    async def query_documents(
-        self, conversation_id: str, query: str, n_results: int = 5
-    ) -> List[Dict[str, Any]]:
-        """Query documents in a conversation's collection"""
-        collection_name = f"conversation_{conversation_id}"
+        if file_path:
+            documents = self._load_by_path(file_path)
+        else:
+            documents = self._load_by_bytes(file_bytes)
+        return self._split_documents(documents, chunk_size, chunk_overlap)
 
-        async with httpx.AsyncClient() as client:
-            response = await client.post(
-                f"{self.chroma_url}/api/v1/collections/{collection_name}/query",
-                headers=self.headers,
-                json={"query_texts": [query], "n_results": n_results},
-            )
-            response.raise_for_status()
-            results = response.json()
+    def _load_by_bytes(self, file_bytes: bytes | None) -> list[Document]:
+        if not file_bytes:
+            raise ValueError("Debe proporcionar bytes del archivo.")
 
-            # Format results
-            documents = results.get("documents", [[]])[0]
-            metadatas = results.get("metadatas", [[]])[0]
-            distances = results.get("distances", [[]])[0]
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp:
+            tmp.write(file_bytes)
+            tmp.flush()
+            pdf_path = tmp.name
 
-            return [
-                {
-                    "content": doc,
-                    "metadata": meta,
-                    "relevance": 1 - dist,  # Convert distance to relevance score
-                }
-                for doc, meta, dist in zip(documents, metadatas, distances)
-            ]
+        loader = PyPDFLoader(pdf_path)
+        return loader.load()
+
+    def _load_by_path(self, file_path: str) -> list[Document]:
+        loader = PyPDFLoader(file_path)
+        return loader.load()
+
+    def _split_documents(
+        self, documents: list[Document], chunk_size: int, chunk_overlap: int
+    ) -> list[Document]:
+        splitter = RecursiveCharacterTextSplitter(
+            chunk_size=chunk_size, chunk_overlap=chunk_overlap, add_start_index=True
+        )
+        return splitter.split_documents(documents)

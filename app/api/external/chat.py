@@ -8,6 +8,8 @@ from schemas.external.message_schema import MessageInput
 from services.chat_service import ChatService
 from sqlalchemy.orm import Session
 
+from services.rag_service import VectorStoreService
+
 router = APIRouter()
 logger = logging.getLogger(f"app.{__name__}")
 
@@ -44,17 +46,12 @@ async def message_generate(
 @version(1, 0)
 async def upload_pdf(
     file: UploadFile = File(...),
-    chat_id: str | None = None,
-    username: str | None = None,
-    session: Session = Depends(get_session),
-) -> Dict[str, str]:
+) -> dict:
     """
     Upload a PDF file to be used as context in the chat.
 
     Args:
         file: The PDF file to upload
-        chat_id: Optional chat ID to associate the document with
-        username: Optional username for the chat
 
     Returns:
         dict: A dictionary containing the document ID
@@ -64,8 +61,8 @@ async def upload_pdf(
 
     contents = await file.read()
 
-    chat_service = ChatService(session=session, chat_id=chat_id, username=username)
+    chat_service = VectorStoreService()
 
-    document_id = await chat_service.process_pdf(contents)
+    document_id = chat_service.add_pdf_to_vector_store(contents)
 
-    return {"document_id": document_id}
+    return {"document_len": len(document_id)}
