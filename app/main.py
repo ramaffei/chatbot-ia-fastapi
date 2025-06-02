@@ -12,8 +12,8 @@ from starlette_context import plugins
 from starlette_context.middleware import RawContextMiddleware
 
 app_original = FastAPI(
-    title="MSCampaign",
-    description="MSCampaign Microservice",
+    title="MSChatBot",
+    description="ChatBot Microservice",
     root_path=project_settings.RootPath,
 )
 
